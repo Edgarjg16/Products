@@ -1,5 +1,10 @@
 namespace com.logali;
 
+using {
+    cuid,
+    managed
+} from '@sap/cds/common';
+
 type Name : String(50);
 
 type Address {
@@ -10,44 +15,12 @@ type Address {
     Country    : String(3);
 };
 
-// Comentar Ctrl + K + C
-// Descomentar Ctrl K U
-// type EmailsAddresses_01 : many {
-//     Kind  : String;
-//     email : String;
-// };
-
-// type EmailsAddresses_02 : array of {
-//     Kind  : String;
-//     email : String;
-// };
-
-// type Email {
-//     Email_01 : EmailsAddresses_01;
-//     Email_02 : many EmailsAddresses_02;
-//     Email_03 : many {
-//         Kind  : String;
-//         Email : String;
-//     };
-// };
-
-// entity Emails {
-//     Emails : Email;
-// };
-
 type Dec  : Decimal(16, 2);
 
-// entity Car {
-//     key ID                 : UUID;
-//         Name               : String;
-//         virtual Discount_1 : Decimal;
-//         virtual Discoubt_2 : Decimal;
-// };
-
-entity Products {
-    key ID               : UUID;
+context materials {
+    entity Products : cuid, managed {
         Name             : String not null;
-        Description      : String;
+        Description      : localized String;
         ImageUrl         : String;
         ReleaseDate      : DateTime default $now;
         DiscontinuedDate : DateTime;
@@ -56,140 +29,170 @@ entity Products {
         Width            : Decimal(16, 2);
         Depth            : Decimal(16, 2);
         Quantity         : Decimal(16, 2);
-};
+        Supplier         : Association to one sales.Suppliers;
+        UnitOfMeasure    : Association to UnitOfMeasures;
+        Currency         : Association to Currencies;
+        DimensionUnit    : Association to DimensionUnits;
+        Category         : Association to Categories;
+        SalesData        : Association to many sales.SalesData
+                               on SalesData.Product = $self;
+        Reviews          : Association to many ProductReviews
+                               on Reviews.Product = $self;
+    };
 
-entity Suppliers {
-    key ID      : UUID;
-        Name    : type of Products : Name;
-        Address : Address;
-        Email   : String;
-        Phone   : String;
-        Fax     : String;
-};
+    entity Categories {
+        key ID   : String(1);
+            Name : localized String;
+    };
 
-entity Categories {
-    key ID   : String(1);
-        Name : String;
+    entity StockAvailability {
+        key ID          : Integer;
+            Description : localized String;
+            Product     : Association to Products;
+    };
 
-};
+    entity Currencies {
+        key ID          : String(3);
+            Description : localized String;
+    };
 
-entity StockAvailability {
-    key ID          : Integer;
-        Description : String;
-};
+    entity UnitOfMeasures {
+        key ID          : String(2);
+            Description : localized String;
+    };
 
-entity Currencies {
-    key ID          : String(3);
-        Description : String;
-};
+    entity DimensionUnits {
+        key ID          : String(2);
+            Description : localized String;
+    };
 
-entity UnitOfMeasures {
-    key ID          : String(2);
-        Description : String;
-};
-
-entity DimensionUnits {
-    key ID          : String(2);
-        Description : String;
-};
-
-entity Months {
-    key ID               : String(2);
-        Description      : String;
-        ShortDescription : String(3);
-};
-
-entity ProductReviews {
-    key ID           : UUID;
+    entity ProductReviews : cuid {
         ToProduct_Id : UUID;
-        CreatedAt    : DateTime;
+        Created      : DateTime;
         Name         : String;
         Rating       : Integer;
         comment      : String;
-};
-
-entity SalesData {
-    key ID           : UUID;
-        DeliveryDate : DateTime;
-        Revenue      : Decimal(16, 2);
-};
-
-// type Gender : String enum {
-//     male;
-//     female;
-// };
-
-// entity Order {
-//     ClientGender : Gender;
-//     Status       : Integer enum {
-//         Submitted = 1;
-//         Fulfiller = 2;
-//         Shipped = 3;
-//         Cancel = 4;
-//     };
-//     Priority     : String enum {
-//         High;
-//         Medium;
-//         Low;
-//     };
-// };
-
-entity SelProducts   as select from Products;
-
-entity SelProducts1  as
-    select from Products {
-        *
+        Product      : Association to Products;
     };
 
-entity SelProducts2  as
-    select from Products {
-        Name,
-        Price,
-        Quantity
-    };
+    entity ProjProducts  as projection on Products;
 
-entity SelProducts3  as
-    select from Products
-    left join ProductReviews
-        on Products.Name = ProductReviews.Name
-    {
-        Rating,
-        Products.Name,
-        Sum(Price) as TotalPrice
+    entity ProjProducts2 as
+        projection on Products {
+            *
+        };
+
+    entity ProjProducts3 as
+        projection on Products {
+            ReleaseDate,
+            Name
+        };
+
+    extend Products with {
+        PriceCondition     : String(2);
+        PriceDetermination : String(3);
     }
-    group by
-        Rating,
-        Products.Name
-    order by
-        Rating;
+}
 
-entity ProjProducts  as projection on Products;
+context sales {
+    entity Orders : cuid, managed {
+        // key ID       : UUID;
+        Date     : Date;
+        Customer : String;
+        Item     : Composition of many OrderItems
+                       on Item.Order = $self;
+    }
 
-entity ProjProducts2 as
-    projection on Products {
-        *
+    entity OrderItems : cuid, managed {
+        // key ID       : UUID;
+        Order    : Association to Orders;
+        Products : Association to materials.Products;
+        Quantity : Integer;
+    }
+
+    entity Suppliers : cuid, managed {
+        Name     : type of materials.Products : Name;
+        Address  : Address;
+        Email    : String;
+        Phone    : String;
+        Fax      : String;
+        Products : Association to many materials.Products
+                       on $self = Products.Supplier;
     };
 
-entity ProjProducts3 as
-    projection on Products {
-        ReleaseDate,
-        Name
+    entity Months {
+        key ID               : String(2);
+            Description      : localized String;
+            ShortDescription : localized String(3);
     };
 
-// entity ParamProducts(pname: String)     as
-//     select from Products {
-//         Name,
-//         Price,
-//         Quantity
-//     }
-//     where
-//         Name = :pname;
+    entity SelProducts  as select from materials.Products;
 
-// entity ProjParamProducts(pname: String) as projection on Products
-//                                            where
-//                                                Name = :pname;
+    entity SelProducts1 as
+        select from materials.Products {
+            *
+        };
 
-extend Products with {
-    PriceCondition     : String(2);
-    PriceDetermination : String(3);
+    entity SelProducts2 as
+        select from materials.Products {
+            Name,
+            Price,
+            Quantity
+        };
+
+    entity SelProducts3 as
+        select from materials.Products
+        left join materials.ProductReviews
+            on Products.Name = ProductReviews.Name
+        {
+            Rating,
+            Products.Name,
+            sum(Price) as TotalPrice
+        }
+        group by
+            Rating,
+            Products.Name
+        order by
+            Rating;
+
+    entity SalesData : cuid, managed {
+        DeliveryDate  : UUID;
+        Revenue       : Decimal(16, 2);
+        Product       : Association to materials.Products;
+        Currency      : Association to materials.Currencies;
+        DeliveryMonth : Association to sales.Months;
+    };
+
+}
+
+context Reports {
+    entity AverageRating as
+        select from logali.materials.ProductReviews {
+            Product.ID  as ProductId,
+            avg(Rating) as AverageRating : Decimal(16, 2)
+        }
+        group by
+            Product.ID;
+
+    entity Products      as
+        select from logali.materials.Products
+        mixin {
+            ToStockAvailability : Association to logali.materials.StockAvailability
+                                      on ToStockAvailability.ID = $projection.StockAvailability;
+
+            ToAverageRating     : Association to AverageRating
+                                      on ToAverageRating.ProductId = ID;
+        }
+        into {
+            *,
+            ToAverageRating.AverageRating as Rating,
+            case
+                when Quantity >= 8
+                     then 8
+                when Quantity > 0
+                     then 2
+                else 1
+            end                           as StockAvailability : Integer,
+            ToStockAvailability
+        }
 }
