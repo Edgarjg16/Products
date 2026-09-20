@@ -1,15 +1,14 @@
-// const cds = require("@sap/cds");
-// const { SELECT, INSERT, UPDATE, DELETE } = cds.ql;
-// const { Orders } = cds.entities("com.training");
-
-// module.exports = (srv) => {
-
 import cds from "@sap/cds";
 
 const { SELECT, INSERT, UPDATE, DELETE } = cds.ql;
 const { Orders } = cds.entities("com.training");
 
 export default (srv) => {
+
+    srv.before("*", (req) => {
+        console.log(`Method: ${req.method}`);
+        console.log(`Target: ${req.target}`);
+    });
 
     //*******READ***********/
     srv.on("READ", "GetOrders", async (req) => {
@@ -106,14 +105,13 @@ export default (srv) => {
 
     //******** FUNTION ********
     srv.on("getClientTaxRate", async (req) => {
-        console.log("Country:", result[0].Country);
         const { clientEmail } = req.data;
 
         const db = cds.transaction(req);
 
         const result = await db
             .read(Orders)
-            .columns("Country")
+            .columns("Country_code")
             .where({
                 ClientEmail: clientEmail
             });
@@ -125,9 +123,9 @@ export default (srv) => {
             return;
         }
 
-        console.log("Country:", result[0].Country);
+        console.log("Country_code:", result[0].Country_code);
 
-        switch (result[0].Country) {
+        switch (result[0].Country_code) {
 
             case "UK":
                 return 25.50;
@@ -139,26 +137,53 @@ export default (srv) => {
                 return 99;
         }
     });
+
+    // ************** ACTION ***********************/
+    srv.on("cancelOrder", async (req) => {
+        const { clientEmail } = req.data;
+        const db = cds.transaction(req);
+        const resultRead = await db.run(
+            SELECT.from("com.training.Orders")
+                .columns(
+                    "ClientEmail",
+                    "FirstName",
+                    "LastName",
+                    "Approved"
+                )
+                .where({
+                    ClientEmail: clientEmail
+                })
+        );
+        console.log("ClientEmail:", clientEmail);
+        console.log("Result:", resultRead);
+        if (!resultRead || resultRead.length === 0) {
+            req.error(
+                404,
+                `Cliente ${clientEmail} no encontrado`
+            );
+            return;
+        }
+        const order = resultRead[0];
+        if (order.Approved === false) {
+            await db.run(
+                UPDATE("com.training.Orders")
+                    .set({
+                        Status: "C"
+                    })
+                    .where({
+                        ClientEmail: clientEmail
+                    })
+            );
+            console.log("Action cancelOrder executed");
+            return {
+                status: "Succeeded",
+                message: `The Order placed by ${order.FirstName} ${order.LastName} was cancelled`
+            };
+        } else {
+            return {
+                status: "Failed",
+                message: `The Order placed by ${order.FirstName} ${order.LastName} was NOT cancelled`
+            };
+        }
+    });
 };
-
-
-// import cds from "@sap/cds";
-
-// console.log(">>> Service JS EJECUTADO <<<");
-
-// const { SELECT, INSERT, UPDATE, DELETE } = cds.ql;
-// const { Orders } = cds.entities("com.training");
-
-// export default (srv) => {
-
-//     console.log(">>> MANAGEORDERS HANDLER CARGADO <<<");
-
-//     // ******** FUNCTION ********
-//     srv.on("getClientTaxRate", async (req) => {
-
-//         console.log(">>> getClientTaxRate EJECUTADO <<<");
-
-//         return 21.50;
-//     });
-
-// };
