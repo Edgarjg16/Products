@@ -1,0 +1,41 @@
+{
+  "name": "Cap-products",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "@cap-js/graphql": "^0.14.0",
+    "@cap-js/hana": "^3",
+    "@sap/cds": "^10",
+    "@sap/cds-odata-v2-adapter-proxy": "^1.9.21",
+    "cors": "^2.8.6",
+    "dotenv": "^10.0.0"
+  },
+  "devDependencies": {
+    "@cap-js/sqlite": "^3",
+    "@sap/cds-dk": "^10",
+    "cds-swagger-ui-express": "^0.11.0"
+  },
+  "scripts": {
+    "start": "cds-serve"
+  },
+  "cds": {
+    "requires": {
+      "sapbackend": {
+        "kind": "hana",
+        "model": "srv/external/sapbackend",
+        "[development]": {
+          "credentials": {
+            "url": "http://erp13.sap4practice.com:9037/sap/opu/odata/sap/YSAPUI5_SRV_01/",
+            "authentication": "NoAuthentication"
+          }
+        },
+        "[production]": {
+          "credentials": {
+            "destination": "SAPBackend"
+          }
+        }
+      }
+    }
+  },
+  "private": true
+}
